@@ -115,15 +115,27 @@ STRICT RULES:
 - Do NOT add extra text
 - Keep HTML unchanged
 
+VARIANT RULES (VERY IMPORTANT):
+- ALWAYS translate Option1 Name, Option2 Name, Option3 Name
+- ALWAYS translate Option1 Value, Option2 Value, Option3 Value
+- These are usually product variants like Color, Size, Material
+
+EXAMPLES:
+- "Cor" → "Color"
+- "Vermelho" → "Red"
+- "Preto" → "Black"
+- "Azul" → "Blue"
+
+- Make variant names clean and standard:
+  - Color, Size, Material (not weird translations)
+
 CRITICAL:
-- DO NOT translate or modify these fields:
+- DO NOT translate these fields:
   - Variant Inventory Policy
   - Variant Inventory Tracker
   - Variant Fulfillment Service
   - Variant Requires Shipping
   - Variant Taxable
-
-- Keep their original values EXACTLY as they are
 
 DATA:
 ${JSON.stringify(row)}
