@@ -105,7 +105,7 @@ function Translator() {
       setProgress(`Processing ${i + 1}-${i + batch.length} of ${parsed.length}`);
 
       const promises = batch.map(async (row) => {
-        const prompt = `
+  const prompt = `
 Translate this Shopify product data to ${lang}.
 
 STRICT RULES:
@@ -114,6 +114,16 @@ STRICT RULES:
 - Do NOT remove or rename keys
 - Do NOT add extra text
 - Keep HTML unchanged
+
+CRITICAL:
+- DO NOT translate or modify these fields:
+  - Variant Inventory Policy
+  - Variant Inventory Tracker
+  - Variant Fulfillment Service
+  - Variant Requires Shipping
+  - Variant Taxable
+
+- Keep their original values EXACTLY as they are
 
 DATA:
 ${JSON.stringify(row)}
