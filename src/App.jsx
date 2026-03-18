@@ -57,21 +57,9 @@ function Translator() {
   const [status, setStatus] = useState("");
 
   const languages = [
-    "English",
-    "Spanish",
-    "Portuguese",
-    "French",
-    "German",
-    "Italian",
-    "Dutch",
-    "Danish",
-    "Swedish",
-    "Norwegian",
-    "Finnish",
-    "Polish",
-    "Czech",
-    "Romanian",
-    "Hungarian"
+    "English", "Spanish", "Portuguese", "French", "German",
+    "Italian", "Dutch", "Danish", "Swedish", "Norwegian",
+    "Finnish", "Polish", "Czech", "Romanian", "Hungarian"
   ];
 
   const handleFile = (e) => {
@@ -96,7 +84,7 @@ function Translator() {
       skipEmptyLines: true,
     }).data;
 
-    const BATCH_SIZE = 5; // ⚡ speed control
+    const BATCH_SIZE = 5;
     let result = [];
 
     for (let i = 0; i < parsed.length; i += BATCH_SIZE) {
@@ -105,37 +93,28 @@ function Translator() {
       setProgress(`Processing ${i + 1}-${i + batch.length} of ${parsed.length}`);
 
       const promises = batch.map(async (row) => {
-  const prompt = `
-Translate this Shopify product data to ${lang}.
+        const prompt = `
+You are editing a Shopify CSV row.
+
+Translate ONLY the values to ${lang}.
 
 STRICT RULES:
-- Output MUST be fully in ${lang}
-- Keep JSON structure EXACTLY the same
-- Do NOT remove or rename keys
-- Do NOT add extra text
-- Keep HTML unchanged
+- DO NOT add/remove fields
+- DO NOT change keys
+- KEEP structure EXACTLY the same
 
-VARIANT RULES (VERY IMPORTANT):
-- ALWAYS translate Option1 Name, Option2 Name, Option3 Name
-- ALWAYS translate Option1 Value, Option2 Value, Option3 Value
-- These are usually product variants like Color, Size, Material
+VARIANTS:
+- ALWAYS translate Option1/2/3 Name and Value
+- DO NOT create new variants
 
-EXAMPLES:
-- "Cor" → "Color"
-- "Vermelho" → "Red"
-- "Preto" → "Black"
-- "Azul" → "Blue"
+DO NOT TRANSLATE:
+- Variant Inventory Policy
+- Variant Inventory Tracker
+- Variant Fulfillment Service
+- Variant Requires Shipping
+- Variant Taxable
 
-- Make variant names clean and standard:
-  - Color, Size, Material (not weird translations)
-
-CRITICAL:
-- DO NOT translate these fields:
-  - Variant Inventory Policy
-  - Variant Inventory Tracker
-  - Variant Fulfillment Service
-  - Variant Requires Shipping
-  - Variant Taxable
+RETURN ONLY JSON
 
 DATA:
 ${JSON.stringify(row)}
@@ -157,11 +136,51 @@ ${JSON.stringify(row)}
 
           const json = await res.json();
 
-          if (!json.choices) return row;
+          let translated;
 
-          return JSON.parse(json.choices[0].message.content);
-        } catch (err) {
-          console.log("Error:", err);
+          try {
+            translated = JSON.parse(json.choices[0].message.content);
+          } catch {
+            return row;
+          }
+
+          // 🔥 FORCE VARIANT FIX
+          const variantFields = [
+            "Option1 Name", "Option1 Value",
+            "Option2 Name", "Option2 Value",
+            "Option3 Name", "Option3 Value"
+          ];
+
+          for (const field of variantFields) {
+            if (row[field] && translated[field] === row[field]) {
+              try {
+                const retryPrompt = `Translate this word to ${lang}: "${row[field]}"`;
+
+                const retryRes = await fetch("https://api.openai.com/v1/chat/completions", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer " + apiKey
+                  },
+                  body: JSON.stringify({
+                    model: "gpt-4.1-mini",
+                    messages: [{ role: "user", content: retryPrompt }],
+                    temperature: 0
+                  })
+                });
+
+                const retryJson = await retryRes.json();
+                translated[field] = retryJson.choices[0].message.content.trim();
+
+              } catch {
+                translated[field] = row[field];
+              }
+            }
+          }
+
+          return translated;
+
+        } catch {
           return row;
         }
       });
@@ -182,7 +201,6 @@ ${JSON.stringify(row)}
     a.download = "translated.csv";
     a.click();
 
-    // ✅ FINAL STATUS
     setLoading(false);
     setProgress("");
     setStatus("✅ Translation completed — file downloaded");
@@ -206,22 +224,10 @@ ${JSON.stringify(row)}
         boxShadow: "0 10px 30px rgba(0,0,0,0.08)"
       }}>
 
-        <h2 style={{ marginBottom: 10 }}>CSV Translator</h2>
+        <h2>CSV Translator</h2>
 
-        <p style={{
-          fontSize: 13,
-          color: "#666",
-          marginBottom: 20
-        }}>
+        <p style={{ fontSize: 13, color: "#666" }}>
           Translate Shopify product CSV files instantly
-        </p>
-
-        <p style={{
-          color: "#e63946",
-          fontSize: 12,
-          marginBottom: 15
-        }}>
-          ⚠️ Use an API key with small balance (€5–10)
         </p>
 
         <input
@@ -229,37 +235,23 @@ ${JSON.stringify(row)}
           placeholder="OpenAI API Key"
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
-          style={{
-            width: "100%",
-            padding: 12,
-            borderRadius: 8,
-            border: "1px solid #ddd",
-            marginBottom: 15
-          }}
+          style={{ width: "100%", padding: 12, marginTop: 15 }}
         />
 
         <input
           type="file"
           accept=".csv"
           onChange={handleFile}
-          style={{ marginBottom: 15 }}
+          style={{ marginTop: 15 }}
         />
 
         <select
           value={lang}
           onChange={(e) => setLang(e.target.value)}
-          style={{
-            width: "100%",
-            padding: 12,
-            borderRadius: 8,
-            border: "1px solid #ddd",
-            marginBottom: 20
-          }}
+          style={{ width: "100%", padding: 12, marginTop: 15 }}
         >
-          {languages.map((language) => (
-            <option key={language} value={language}>
-              {language}
-            </option>
+          {languages.map((l) => (
+            <option key={l}>{l}</option>
           ))}
         </select>
 
@@ -269,13 +261,11 @@ ${JSON.stringify(row)}
           style={{
             width: "100%",
             padding: 14,
+            marginTop: 20,
             backgroundColor: "#007AFF",
             color: "#fff",
             border: "none",
-            borderRadius: 10,
-            fontSize: 16,
-            fontWeight: "600",
-            cursor: "pointer"
+            borderRadius: 10
           }}
         >
           {loading ? "Translating..." : status ? "Done ✅" : "Translate CSV"}
